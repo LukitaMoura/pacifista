@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pacifista - Auditor de Código e Segurança</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <div class="glow glow-1"></div>
+    <div class="glow glow-2"></div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-logo">🛡️</div>
+                <div class="brand-text">
+                    <h1>Pacifista</h1>
+                    <span>Segurança & Qualidade</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" id="btn-dashboard">
+                    <span class="icon">📊</span> Dashboard
+                </a>
+                <a href="#" class="nav-item" id="btn-issues">
+                    <span class="icon">🚨</span> Vulnerabilidades
+                </a>
+                <a href="#" class="nav-item" id="btn-checklist">
+                    <span class="icon">🧪</span> Plano de Testes
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <span class="version">v1.0.0</span>
+                <span class="status-online"><span class="dot"></span> Ativo</span>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Topbar -->
+            <header class="topbar">
+                <div class="scan-panel">
+                    <div class="input-wrapper">
+                        <span class="folder-icon">📁</span>
+                        <input type="text" id="scan-path-input" placeholder="Caminho completo do diretório para auditoria..." value="{{ default_path }}">
+                    </div>
+                    <button class="btn btn-primary" id="btn-run-scan">
+                        <span class="spinner" id="scan-spinner"></span>
+                        <span id="btn-scan-text">Iniciar Varredura</span>
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-body">
+                <!-- Welcome / Empty State Screen -->
+                <section class="screen active" id="screen-welcome">
+                    <div class="welcome-card">
+                        <div class="welcome-icon">🛡️</div>
+                        <h2>Pronto para Analisar seu Código?</h2>
+                        <p>O Pacifista analisa falhas de segurança críticas (como SQL Injection, chaves hardcoded e injeções de sistema), mede a complexidade de lógica e revisa a limpeza do seu código Python.</p>
+                        <p class="subtext">Insira o caminho do seu projeto no topo e clique em <strong>Iniciar Varredura</strong> para começar.</p>
+                    </div>
+                </section>
+
+                <!-- Dashboard Screen -->
+                <section class="screen" id="screen-dashboard">
+                    <div class="grid-stats">
+                        <div class="stat-card score-card">
+                            <h3>Score de Saúde do Código</h3>
+                            <div class="score-display">
+                                <span id="health-score-num">100</span>
+                                <span class="score-max">/100</span>
+                            </div>
+                            <div class="score-progress-bar">
+                                <div class="progress" id="health-score-progress"></div>
+                            </div>
+                            <p class="score-desc" id="health-score-status">Código Seguro</p>
+                        </div>
+
+                        <div class="stat-card chart-card">
+                            <h3>Visão Geral de Desvios</h3>
+                            <div class="chart-container">
+                                <canvas id="findings-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="stat-card summary-card">
+                            <h3>Métricas Gerais</h3>
+                            <div class="metric-row">
+                                <span class="metric-label">Arquivos Analisados</span>
+                                <span class="metric-val" id="total-files-count">0</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Alertas Críticos</span>
+                                <span class="metric-val text-critical" id="count-critical">0</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Alertas Altos</span>
+                                <span class="metric-val text-high" id="count-high">0</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Alertas Médios</span>
+                                <span class="metric-val text-medium" id="count-medium">0</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Alertas Baixos</span>
+                                <span class="metric-val text-low" id="count-low">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recent-vulnerabilities-panel">
+                        <div class="panel-header">
+                            <h2>Vulnerabilidades Recentes</h2>
+                            <button class="btn btn-secondary btn-sm" id="btn-export-md">📄 Exportar Relatório Markdown</button>
+                        </div>
+                        <div class="recent-list" id="recent-issues-list">
+                            <!-- Injetado dinamicamente -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Issues Detail Screen -->
+                <section class="screen" id="screen-issues">
+                    <div class="panel-header">
+                        <h2>Detalhamento de Vulnerabilidades</h2>
+                    </div>
+                    <div class="filters">
+                        <button class="filter-chip active" data-severity="ALL">Todos (<span id="filter-all-count">0</span>)</button>
+                        <button class="filter-chip" data-severity="CRITICAL">🔥 Crítico (<span id="filter-crit-count">0</span>)</button>
+                        <button class="filter-chip" data-severity="HIGH">🔴 Alto (<span id="filter-high-count">0</span>)</button>
+                        <button class="filter-chip" data-severity="MEDIUM">🟡 Médio (<span id="filter-med-count">0</span>)</button>
+                        <button class="filter-chip" data-severity="LOW">🔵 Baixo (<span id="filter-low-count">0</span>)</button>
+                    </div>
+                    <div class="issues-container" id="all-issues-list">
+                        <!-- Injetado dinamicamente -->
+                    </div>
+                </section>
+
+                <!-- Checklist/Test Plan Screen -->
+                <section class="screen" id="screen-checklist">
+                    <div class="panel-header">
+                        <h2>🧪 Plano de Testes & Provas de Conceito (PoC)</h2>
+                        <p class="subtitle">Como testar e validar o seu código contra vulnerabilidades reais no ambiente de desenvolvimento</p>
+                    </div>
+                    <div class="checklist-container" id="test-checklist-list">
+                        <!-- Injetado dinamicamente -->
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Web App Main Logic -->
+    <script>
+        // Variáveis de Controle e Estado
+        let activeReportData = null;
+        let chartInstance = null;
+        let currentSeverityFilter = "ALL";
+
+        // Mapeamento de UI
+        const buttons = {
+            dashboard: document.getElementById('btn-dashboard'),
+            issues: document.getElementById('btn-issues'),
+            checklist: document.getElementById('btn-checklist'),
+            runScan: document.getElementById('btn-run-scan'),
+            exportMd: document.getElementById('btn-export-md')
+        };
+
+        const screens = {
+            welcome: document.getElementById('screen-welcome'),
+            dashboard: document.getElementById('screen-dashboard'),
+            issues: document.getElementById('screen-issues'),
+            checklist: document.getElementById('screen-checklist')
+        };
+
+        // Gerenciamento de Telas / Abas
+        function switchScreen(screenName) {
+            Object.values(screens).forEach(screen => screen.classList.remove('active'));
+            Object.values(buttons).forEach(btn => {
+                if (btn && btn.classList) btn.classList.remove('active');
+            });
+
+            if (screenName === 'welcome') {
+                screens.welcome.classList.add('active');
+            } else if (screenName === 'dashboard') {
+                screens.dashboard.classList.add('active');
+                buttons.dashboard.classList.add('active');
+            } else if (screenName === 'issues') {
+                screens.issues.classList.add('active');
+                buttons.issues.classList.add('active');
+            } else if (screenName === 'checklist') {
+                screens.checklist.classList.add('active');
+                buttons.checklist.classList.add('active');
+            }
+        }
+
+        buttons.dashboard.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (activeReportData) switchScreen('dashboard');
+        });
+        buttons.issues.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (activeReportData) switchScreen('issues');
+        });
+        buttons.checklist.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (activeReportData) switchScreen('checklist');
+        });
+
+        // Configuração de Chips de Filtro
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                currentSeverityFilter = chip.getAttribute('data-severity');
+                renderIssues();
+            });
+        });
+
+        // Exibir Toast de Notificação
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast show ${type}`;
+            setTimeout(() => {
+                toast.className = toast.className.replace('show', '');
+            }, 4000);
+        }
+
+        // Executar varredura
+        buttons.runScan.addEventListener('click', async () => {
+            const pathInput = document.getElementById('scan-path-input').value.trim();
+            if (!pathInput) {
+                showToast("Por favor, forneça um caminho válido.", "error");
+                return;
+            }
+
+            // Iniciar Spinner de Loading
+            buttons.runScan.disabled = true;
+            document.getElementById('scan-spinner').style.display = 'inline-block';
+            document.getElementById('btn-scan-text').textContent = 'Analisando...';
+
+            try {
+                const response = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: pathInput })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || "Erro inesperado.");
+                }
+
+                activeReportData = await response.json();
+                showToast("Varredura concluída com sucesso!");
+                
+                // Renderizar Painéis com dados
+                updateDashboard();
+                renderIssues();
+                renderChecklist();
+                
+                // Mudar para tela Dashboard
+                switchScreen('dashboard');
+            } catch (err) {
+                showToast(`Falha no escaneamento: ${err.message}`, "error");
+            } finally {
+                buttons.runScan.disabled = false;
+                document.getElementById('scan-spinner').style.display = 'none';
+                document.getElementById('btn-scan-text').textContent = 'Iniciar Varredura';
+            }
+        });
+
+        // Exportar relatório em Markdown
+        buttons.exportMd.addEventListener('click', async () => {
+            if (!activeReportData) return;
+            
+            try {
+                const response = await fetch('/api/export-markdown', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ report_data: activeReportData })
+                });
+
+                if (!response.ok) throw new Error("Erro na exportação.");
+
+                const resData = await response.json();
+                showToast(`Relatório exportado para:\n${resData.file_path}`, "success");
+            } catch (err) {
+                showToast(`Falha na exportação: ${err.message}`, "error");
+            }
+        });
+
+        // Atualizar Dashboard
+        function updateDashboard() {
+            // Health Score
+            const score = activeReportData.score;
+            const healthNum = document.getElementById('health-score-num');
+            const healthBar = document.getElementById('health-score-progress');
+            const healthStatus = document.getElementById('health-score-status');
+
+            healthNum.textContent = score;
+            healthBar.style.width = `${score}%`;
+
+            if (score >= 85) {
+                healthStatus.textContent = "Código Saudável";
+                healthStatus.className = "score-desc text-low"; // green
+                healthBar.style.backgroundColor = "var(--severity-low)";
+            } else if (score >= 60) {
+                healthStatus.textContent = "Atenção Necessária";
+                healthStatus.className = "score-desc text-medium"; // yellow
+                healthBar.style.backgroundColor = "var(--severity-medium)";
+            } else {
+                healthStatus.textContent = "Código Vulnerável";
+                healthStatus.className = "score-desc text-critical"; // red
+                healthBar.style.backgroundColor = "var(--severity-critical)";
+            }
+
+            // Estatísticas
+            document.getElementById('total-files-count').textContent = activeReportData.total_files;
+            document.getElementById('count-critical').textContent = activeReportData.stats.CRITICAL;
+            document.getElementById('count-high').textContent = activeReportData.stats.HIGH;
+            document.getElementById('count-medium').textContent = activeReportData.stats.MEDIUM;
+            document.getElementById('count-low').textContent = activeReportData.stats.LOW;
+
+            // Filtros contadores
+            document.getElementById('filter-all-count').textContent = activeReportData.stats.total_issues;
+            document.getElementById('filter-crit-count').textContent = activeReportData.stats.CRITICAL;
+            document.getElementById('filter-high-count').textContent = activeReportData.stats.HIGH;
+            document.getElementById('filter-med-count').textContent = activeReportData.stats.MEDIUM;
+            document.getElementById('filter-low-count').textContent = activeReportData.stats.LOW;
+
+            // Renderizar Gráfico Donut
+            renderChart();
+
+            // Renderizar Lista Recente
+            const recentContainer = document.getElementById('recent-issues-list');
+            recentContainer.innerHTML = '';
+            
+            if (activeReportData.findings.length === 0) {
+                recentContainer.innerHTML = '<div class="empty-list-info">Parabéns! Nenhuma vulnerabilidade ou desvio foi detectado.</div>';
+                return;
+            }
+
+            // Pega no máximo os 4 primeiros recentes
+            const recentItems = activeReportData.findings.slice(0, 4);
+            recentItems.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'recent-issue-row';
+                row.innerHTML = `
+                    <div class="issue-left">
+                        <span class="severity-badge badge-${item.severity.toLowerCase()}">${item.severity}</span>
+                        <span class="issue-title-text">${item.title}</span>
+                    </div>
+                    <span class="issue-file-location">${item.file}:${item.line}</span>
+                `;
+                recentContainer.appendChild(row);
+            });
+        }
+
+        // Renderizar ChartJS
+        function renderChart() {
+            const ctx = document.getElementById('findings-chart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Crítico', 'Alto', 'Médio', 'Baixo'],
+                    datasets: [{
+                        data: [
+                            activeReportData.stats.CRITICAL,
+                            activeReportData.stats.HIGH,
+                            activeReportData.stats.MEDIUM,
+                            activeReportData.stats.LOW
+                        ],
+                        backgroundColor: [
+                            'rgba(255, 61, 93, 0.85)',
+                            'rgba(255, 115, 61, 0.85)',
+                            'rgba(255, 198, 61, 0.85)',
+                            'rgba(61, 255, 143, 0.85)'
+                        ],
+                        borderColor: '#1e1c2a',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#e2e8f0',
+                                font: {
+                                    family: 'Plus Jakarta Sans',
+                                    size: 11
+                                }
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        // Renderizar Lista Detalhada de Achados
+        function renderIssues() {
+            const container = document.getElementById('all-issues-list');
+            container.innerHTML = '';
+
+            const filteredFindings = activeReportData.findings.filter(f => 
+                currentSeverityFilter === "ALL" || f.severity === currentSeverityFilter
+            );
+
+            if (filteredFindings.length === 0) {
+                container.innerHTML = '<div class="empty-list-info">Nenhuma vulnerabilidade com a gravidade filtrada foi encontrada.</div>';
+                return;
+            }
+
+            filteredFindings.forEach((f, idx) => {
+                const card = document.createElement('div');
+                card.className = `issue-card border-${f.severity.toLowerCase()}`;
+                card.innerHTML = `
+                    <div class="issue-card-header">
+                        <div class="issue-header-title">
+                            <span class="severity-badge badge-${f.severity.toLowerCase()}">${f.severity}</span>
+                            <h3>${f.title}</h3>
+                        </div>
+                        <span class="issue-location"><code>${f.file} : Linha ${f.line}</code></span>
+                    </div>
+                    <div class="issue-card-body">
+                        <p class="issue-description">${f.description}</p>
+                        
+                        <div class="code-snippet-box">
+                            <span class="box-label">Código Afetado:</span>
+                            <pre><code>${escapeHTML(f.code_snippet)}</code></pre>
+                        </div>
+
+                        <div class="solution-box">
+                            <span class="box-label">💡 Recomendação de Correção:</span>
+                            <div class="solution-content">${formatMarkdownCode(f.recommendation)}</div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // Renderizar Roteiro de Testes e Sondagem (Checklist)
+        function renderChecklist() {
+            const container = document.getElementById('test-checklist-list');
+            container.innerHTML = '';
+
+            if (activeReportData.test_checklist.length === 0) {
+                container.innerHTML = '<div class="empty-list-info">Seu código não possui vulnerabilidades conhecidas mapeadas no banco de testes. Parabéns!</div>';
+                return;
+            }
+
+            activeReportData.test_checklist.forEach((t, idx) => {
+                const card = document.createElement('div');
+                card.className = 'checklist-card';
+                
+                const stepsHTML = t.steps.split('\n')
+                    .filter(step => step.trim())
+                    .map((step, sIdx) => {
+                        const stepText = step.replace(/^\d+[\.\-\s]*/, '').trim();
+                        return `
+                            <div class="checklist-item">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="check-${idx}-${sIdx}">
+                                    <span class="checkmark"></span>
+                                    <span class="item-text">${escapeHTML(stepText)}</span>
+                                </label>
+                            </div>
+                        `;
+                    }).join('');
+
+                card.innerHTML = `
+                    <div class="checklist-card-header">
+                        <span class="severity-badge badge-${t.severity.toLowerCase()}">${t.severity}</span>
+                        <h3>Testar: ${t.category}</h3>
+                    </div>
+                    <div class="checklist-card-body">
+                        <p class="instructions">Siga os passos abaixo para verificar se a correção de código resiste a testes ou entradas maliciosas:</p>
+                        <div class="checklist-items">
+                            ${stepsHTML}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // Helpers de Formatação e Escape
+        function escapeHTML(str) {
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function formatMarkdownCode(text) {
+            // Conversão simplificada de blocos de código markdown ```python ... ``` para exibição HTML
+            let formatted = text.replace(/```python\n([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+            formatted = formatted.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+            formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+            return formatted;
+        }
+    </script>
+</body>
+</html>
